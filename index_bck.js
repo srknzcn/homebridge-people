@@ -1,5 +1,4 @@
-const childProcess = require('child_process').exec;
-var ping = require('ping'); 
+var ping = require('ping');
 var moment = require('moment');
 var request = require("request");
 var http = require('http');
@@ -14,9 +13,9 @@ module.exports = function(homebridge) {
     Characteristic = homebridge.hap.Characteristic;
     HomebridgeAPI = homebridge;
 
-    homebridge.registerPlatform("homebridge-people", "People-BT", PeoplePlatform);
-    homebridge.registerAccessory("homebridge-people", "PeopleAccessory-BT", PeopleAccessory);
-    // homebridge.registerAccessory("homebridge-people", "PeopleAllAccessor-BT", PeopleAllAccessory);
+    homebridge.registerPlatform("homebridge-people", "People", PeoplePlatform);
+    homebridge.registerAccessory("homebridge-people", "PeopleAccessory", PeopleAccessory);
+    homebridge.registerAccessory("homebridge-people", "PeopleAllAccessory", PeopleAllAccessory);
 }
 
 // #######################
@@ -48,17 +47,17 @@ PeoplePlatform.prototype = {
             this.accessories.push(peopleAccessory);
             this.peopleAccessories.push(peopleAccessory);
         }
-        // if(this.anyoneSensor) {
-        //     this.peopleAnyOneAccessory = new PeopleAllAccessory(this.log, SENSOR_ANYONE, this);
-        //     this.accessories.push(this.peopleAnyOneAccessory);
-        // }
-        // if(this.nooneSensor) {
-        //     this.peopleNoOneAccessory = new PeopleAllAccessory(this.log, SENSOR_NOONE, this);
-        //     this.accessories.push(this.peopleNoOneAccessory);
-        // }
+        if(this.anyoneSensor) {
+            this.peopleAnyOneAccessory = new PeopleAllAccessory(this.log, SENSOR_ANYONE, this);
+            this.accessories.push(this.peopleAnyOneAccessory);
+        }
+        if(this.nooneSensor) {
+            this.peopleNoOneAccessory = new PeopleAllAccessory(this.log, SENSOR_NOONE, this);
+            this.accessories.push(this.peopleNoOneAccessory);
+        }
         callback(this.accessories);
 
-        // this.startServer();
+        this.startServer();
     },
 
     startServer: function() {
@@ -178,14 +177,9 @@ function PeopleAccessory(log, config, platform) {
 
     this.initStateCache();
 
-    var self = this;
-    // setInterval(function() {
-    //     self.initStateCache();
-    // }, 10000);
-
-    // if(this.pingInterval > -1) {
-    //     // this.ping();
-    // }
+    if(this.pingInterval > -1) {
+        this.ping();
+    }
 }
 
 PeopleAccessory.encodeState = function(state) {
@@ -205,17 +199,12 @@ PeopleAccessory.prototype.initStateCache = function() {
 }
 
 PeopleAccessory.prototype.isActive = function() {
-    console.log('Checking for ', this.target);
-    
-    childProcess('hcitool name ' + this.target, (error, stdout, stderr) => {
-        if (stdout) {
-            console.log(this.name , 'is here', stdout);
-            this.stateCache = true;
-            return true;
-        } else {
-            this.stateCache = false;
-        }
-    });
+    var lastSeenUnix = this.platform.storage.getItemSync('lastSuccessfulPing_' + this.target);
+    if (lastSeenUnix) {
+        var lastSeenMoment = moment(lastSeenUnix);
+        var activeThreshold = moment().subtract(this.threshold, 'm');
+        return lastSeenMoment.isAfter(activeThreshold);
+    }
     return false;
 }
 
